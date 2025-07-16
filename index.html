@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Apresentação de Imagens</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #000;
+      color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #controls {
+      margin: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+    #controls input {
+      padding: 5px;
+      width: 250px;
+    }
+    #controls button {
+      padding: 5px 10px;
+    }
+    #slideshow {
+      max-width: 100%;
+      max-height: 90vh;
+      object-fit: contain;
+      flex-grow: 1;
+    }
+  </style>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+</head>
+<body>
+
+<div id="controls">
+  <input type="text" id="tagsPositivas" placeholder="Tags desejadas (ex: hoyoverse naked_female)">
+  <input type="text" id="tagsNegativas" placeholder="Tags para excluir (ex: dick comic)">
+  <input type="number" id="tempoInput" placeholder="Tempo (seg)" value="5" min="1">
+  <button onclick="buscarImagens()">🔍 Buscar</button>
+  <button onclick="voltarImagem()">⏮ Voltar</button>
+  <button onclick="alternarPausa()"><span id="pauseLabel">⏸ Pausar</span></button>
+  <button onclick="avancarImagem()">⏭ Avançar</button>
+  <button onclick="alternarFullscreen()">🖥️ Tela Cheia</button>
+</div>
+
+<img id="slideshow" src="" alt="Aguardando busca...">
+
+<script>
+  let imagens = [];
+  let index = 0;
+  let intervalo = null;
+  let pausado = false;
+  let pagina = 1;
+  let tagsAtuais = "";
+  let fimDosResultados = false;
+  let tempoPorImagem = 5000;
+  let reiniciou = false;
+
+  const imgElement = document.getElementById("slideshow");
+  const pauseLabel = document.getElementById("pauseLabel");
+
+  function iniciarSlideshow() {
+    if (intervalo) clearInterval(intervalo);
+
+    async function trocarImagem() {
+      if (!pausado && imagens.length > 0) {
+        imgElement.src = imagens[index];
+
+        if (index >= imagens.length - 5 && !fimDosResultados) {
+          pagina++;
+          await buscarMaisImagens(tagsAtuais, pagina);
+        }
+
+        index = (index + 1) % imagens.length;
+      }
+    }
+
+    trocarImagem();
+    intervalo = setInterval(trocarImagem, tempoPorImagem);
+  }
+
+  function alternarPausa() {
+    if (imagens.length === 0) return;
+    pausado = !pausado;
+    pauseLabel.textContent = pausado ? "▶ Retomar" : "⏸ Pausar";
+  }
+
+  function avancarImagem() {
+    if (imagens.length > 0) {
+      index = (index + 1) % imagens.length;
+      imgElement.src = imagens[index];
+    }
+  }
+
+  function voltarImagem() {
+    if (imagens.length > 0) {
+      index = (index - 1 + imagens.length) % imagens.length;
+      imgElement.src = imagens[index];
+    }
+  }
+
+  async function buscarImagens() {
+    const positivas = document.getElementById("tagsPositivas").value.trim().replace(/\s+/g, "+");
+    const negativas = document.getElementById("tagsNegativas").value.trim().replace(/\s+/g, "+");
+    const tempo = parseInt(document.getElementById("tempoInput").value);
+
+    if (!positivas) {
+      alert("Digite ao menos uma tag desejada.");
+      return;
+    }
+
+    imagens = [];
+    index = 0;
+    pagina = 1;
+    fimDosResultados = false;
+    reiniciou = false;
+    pausado = false;
+    pauseLabel.textContent = "⏸ Pausar";
+
+    tempoPorImagem = (isNaN(tempo) || tempo < 1) ? 5000 : tempo * 1000;
+
+    const tags = `${positivas}${negativas ? '+-' + negativas.split('+').join('+-') : ''}`;
+    tagsAtuais = tags;
+
+    await buscarMaisImagens(tags, pagina);
+
+    if (imagens.length > 0) {
+      iniciarSlideshow();
+    } else {
+      imgElement.alt = "Nenhuma imagem encontrada.";
+      imgElement.src = "";
+    }
+  }
+
+  async function buscarMaisImagens(tags, paginaAtual) {
+    const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=1000&q=index&pid=${(paginaAtual - 1)}`;
+
+    try {
+      const response = await fetch(url);
+      const xmlText = await response.text();
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+      const posts = xmlDoc.getElementsByTagName("post");
+
+      let novas = 0;
+      for (let post of posts) {
+        const fileUrl = post.getAttribute("file_url") || post.getAttribute("sample_url");
+        if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
+          imagens.push(fileUrl);
+          novas++;
+        }
+      }
+
+      if (novas === 0) {
+        if (!reiniciou) {
+          console.log("Sem novas imagens. Reiniciando da página 1...");
+          reiniciou = true;
+          pagina = 1;
+          await buscarMaisImagens(tags, pagina);
+        } else {
+          fimDosResultados = true;
+          console.log("Fim total dos resultados.");
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao buscar imagens:", err);
+    }
+  }
+
+
+function alternarFullscreen() {
+  const elem = document.documentElement;
+  const controls = document.getElementById("controls");
+
+  if (!document.fullscreenElement) {
+    elem.requestFullscreen().then(() => {
+      controls.style.display = "none";
+    }).catch(err => {
+      alert(`Erro ao entrar em fullscreen: ${err.message}`);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+  // Atalhos de teclado
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      alternarPausa();
+    } else if (e.code === "ArrowRight") {
+      avancarImagem();
+    } else if (e.code === "ArrowLeft") {
+      voltarImagem();
+    }
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+  const controls = document.getElementById("controls");
+  if (!document.fullscreenElement) {
+    controls.style.display = "flex";
+  }
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js')
+    .then(reg => console.log('✅ Service Worker registrado', reg))
+    .catch(err => console.error('❌ Erro ao registrar Service Worker', err));
+}
+
+</script>
+
+</body>
+</html>
