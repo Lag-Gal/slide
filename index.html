@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8" />
   <title>Slides Lag Gal</title>
@@ -16,6 +17,7 @@
       height: 100vh;
       overflow: hidden;
     }
+
     #controls {
       margin: 10px;
       display: flex;
@@ -23,13 +25,16 @@
       justify-content: center;
       gap: 10px;
     }
+
     #controls input {
       padding: 5px;
       width: 250px;
     }
+
     #controls button {
       padding: 5px 10px;
     }
+
     #mensagemInicial {
       color: white;
       text-align: center;
@@ -37,9 +42,11 @@
       max-width: 800px;
       font-size: 1rem;
     }
+
     #mensagemInicial.hidden {
       display: none;
     }
+
     #slideshow {
       max-width: 100%;
       max-height: 90vh;
@@ -51,28 +58,14 @@
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#000000" />
 </head>
+
 <body>
   <div id="controls">
-    <input
-      type="text"
-      id="tagsPositivas"
-      placeholder="Tags desejadas (ex: naked_female)"
-    />
-    <input
-      type="text"
-      id="tagsNegativas"
-      placeholder="Tags para excluir (ex: dick comic)"
-    />
+    <input type="text" id="tagsPositivas" placeholder="Tags desejadas (ex: naked_female)" />
+    <input type="text" id="tagsNegativas" placeholder="Tags para excluir (ex: dick comic)" />
     <div style="display: flex; align-items: center; gap: 5px;">
       <button onclick="ajustarTempo(-1)">➖</button>
-      <input
-        type="number"
-        id="tempoInput"
-        placeholder="Tempo (seg)"
-        value="5"
-        min="1"
-        style="width: 70px"
-      />
+      <input type="number" id="tempoInput" placeholder="Tempo (seg)" value="5" min="1" style="width: 70px" />
       <button onclick="ajustarTempo(1)">➕</button>
     </div>
     <button onclick="buscarImagens()">🔍 Buscar</button>
@@ -185,16 +178,34 @@
     }
 
     function voltarImagem() {
-      if (imagens.length > 0) {
-        if (timerId) {
-          clearTimeout(timerId);
-          timerId = null;
-        }
-        index = (index - 1 + imagens.length) % imagens.length;
-        imgElement.src = imagens[index];
-        imgElement.style.display = "block";
-        iniciarSlideshow();
+      if (imagens.length === 0 || index === 0) return; // nada a fazer se não houver imagens ou já estiver na primeira
+
+      if (timerId) {
+        clearTimeout(timerId);
+        timerId = null;
       }
+
+      index--; // Move corretamente para a imagem anterior
+
+      imgElement.onload = () => {
+        imgElement.style.display = "block";
+
+        // Reinicia o slideshow sem avançar o index
+        const tempoCampo = parseInt(document.getElementById("tempoInput").value);
+        tempoPorImagem = isNaN(tempoCampo) || tempoCampo < 1 ? 5000 : tempoCampo * 1000;
+
+        timerId = setTimeout(() => {
+          iniciarSlideshow(); // que por sua vez avança corretamente a partir daqui
+        }, tempoPorImagem);
+      };
+
+      imgElement.onerror = () => {
+        console.warn("Erro ao carregar imagem anterior, tentando anterior ainda...");
+        voltarImagem(); // tenta a anterior de novo
+      };
+
+      imgElement.style.display = "none";
+      imgElement.src = imagens[index];
     }
 
     async function buscarImagens() {
@@ -223,9 +234,8 @@
 
       tempoPorImagem = isNaN(tempo) || tempo < 1 ? 5000 : tempo * 1000;
 
-      const tags = `${positivas}${
-        negativas ? "+-" + negativas.split("+").join("+-") : ""
-      }`;
+      const tags = `${positivas}${negativas ? "+-" + negativas.split("+").join("+-") : ""
+        }`;
       tagsAtuais = tags;
 
       await buscarMaisImagens(tags, pagina);
@@ -240,9 +250,8 @@
     }
 
     async function buscarMaisImagens(tags, paginaAtual) {
-      const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=20&q=index&pid=${
-        paginaAtual - 1
-      }`;
+      const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=20&q=index&pid=${paginaAtual - 1
+        }`;
 
       try {
         const response = await fetch(url);
@@ -300,7 +309,13 @@
 
     // Atalhos de teclado
     document.addEventListener("keydown", (e) => {
-      if (e.code === "Space") {
+      if (e.key === "Enter") {
+        const activeElement = document.activeElement;
+        if (activeElement.tagName === "INPUT") {
+          e.preventDefault();
+          buscarImagens();
+        }
+      } else if (e.code === "Space") {
         e.preventDefault();
         alternarPausa();
       } else if (e.code === "ArrowRight") {
@@ -335,4 +350,5 @@
     }
   </script>
 </body>
+
 </html>
