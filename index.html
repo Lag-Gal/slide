@@ -55,11 +55,6 @@
 <body>
 
 <div id="controls">
-  <select id="modoSelecionado">
-    <option value="nsfw" selected>🔞 NSFW (rule34)</option>
-    <option value="sfw">🧼 SFW (safebooru)</option>
-  </select>
-
   <input type="text" id="tagsPositivas" placeholder="Tags desejadas (ex: naked_female)">
   <input type="text" id="tagsNegativas" placeholder="Tags para excluir (ex: dick comic)">
   <div style="display: flex; align-items: center; gap: 5px;">
@@ -187,54 +182,43 @@ function voltarImagem() {
     }
   }
 
-async function buscarMaisImagens(tags, paginaAtual) {
-  const modo = document.getElementById("modoSelecionado").value;
+  async function buscarMaisImagens(tags, paginaAtual) {
+    const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=1000&q=index&pid=${(paginaAtual - 1)}`;
 
-  const baseUrl = modo === "sfw"
-    ? "https://safebooru.org/index.php"
-    : "https://api.rule34.xxx/index.php";
+    try {
+      const response = await fetch(url);
+      const xmlText = await response.text();
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+      const posts = xmlDoc.getElementsByTagName("post");
 
-  const queryUrl = `${baseUrl}?tags=${tags}&page=dapi&s=post&limit=1000&q=index&pid=${(paginaAtual - 1)}`;
+      let novas = 0;
+      for (let post of posts) {
+        const fileUrl = post.getAttribute("file_url") || post.getAttribute("sample_url");
+        if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
+          imagens.push(fileUrl);
+          novas++;
 
-  const finalUrl = modo === "sfw"
-    ? `https://api.allorigins.win/raw?url=${encodeURIComponent(queryUrl)}`
-    : queryUrl;
-
-  try {
-    const response = await fetch(finalUrl);
-    const xmlText = await response.text();
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-    const posts = xmlDoc.getElementsByTagName("post");
-
-    let novas = 0;
-    for (let post of posts) {
-      const fileUrl = post.getAttribute("file_url") || post.getAttribute("sample_url");
-      if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
-        imagens.push(fileUrl);
-        novas++;
-
-        const preload = new Image();
-        preload.src = fileUrl;
+          const preload = new Image();
+          preload.src = fileUrl;  
+        }
       }
-    }
 
-    if (novas === 0) {
-      if (!reiniciou) {
-        console.log("Sem novas imagens. Reiniciando da página 1...");
-        reiniciou = true;
-        pagina = 1;
-        await buscarMaisImagens(tags, pagina);
-      } else {
-        fimDosResultados = true;
-        console.log("Fim total dos resultados.");
+      if (novas === 0) {
+        if (!reiniciou) {
+          console.log("Sem novas imagens. Reiniciando da página 1...");
+          reiniciou = true;
+          pagina = 1;
+          await buscarMaisImagens(tags, pagina);
+        } else {
+          fimDosResultados = true;
+          console.log("Fim total dos resultados.");
+        }
       }
+    } catch (err) {
+      console.error("Erro ao buscar imagens:", err);
     }
-  } catch (err) {
-    console.error("Erro ao buscar imagens:", err);
   }
-}
-
 
 
 function alternarFullscreen() {
