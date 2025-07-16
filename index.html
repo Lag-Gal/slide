@@ -78,18 +78,18 @@
 <img id="slideshow" src="" alt="Aguardando busca...">
 
 <script>
-  let imagens = [];
-  let index = 0;
-  let intervalo = null;
-  let pausado = false;
-  let pagina = 1;
-  let tagsAtuais = "";
-  let fimDosResultados = false;
-  let tempoPorImagem = 5000;
-  let reiniciou = false;
+const imgElement = document.getElementById("slideshow");
+const pauseLabel = document.getElementById("pauseLabel");
 
-  const imgElement = document.getElementById("slideshow");
-  const pauseLabel = document.getElementById("pauseLabel");
+let imagens = [];
+let index = 0;
+let intervalo = null;
+let pausado = false;
+let pagina = 1;
+let tagsAtuais = "";
+let fimDosResultados = false;
+let tempoPorImagem = 5000;
+let reiniciou = false;
 
 function iniciarSlideshow() {
   if (intervalo) clearInterval(intervalo);
@@ -98,7 +98,6 @@ function iniciarSlideshow() {
     if (!pausado && imagens.length > 0) {
       imgElement.src = imagens[index];
       imgElement.style.display = "block";
-
 
       if (index >= imagens.length - 5 && !fimDosResultados) {
         pagina++;
@@ -123,14 +122,14 @@ function iniciarSlideshow() {
     }
   };
 
-  loop(); // inicia o loop dinâmico
+  loop();
 }
 
-  function alternarPausa() {
-    if (imagens.length === 0) return;
-    pausado = !pausado;
-    pauseLabel.textContent = pausado ? "▶ Retomar" : "⏸ Pausar";
-  }
+function alternarPausa() {
+  if (imagens.length === 0) return;
+  pausado = !pausado;
+  pauseLabel.textContent = pausado ? "▶ Retomar" : "⏸ Pausar";
+}
 
 function avancarImagem() {
   if (imagens.length > 0) {
@@ -148,78 +147,64 @@ function voltarImagem() {
   }
 }
 
-  async function buscarImagens() {
-    const positivas = document.getElementById("tagsPositivas").value.trim().replace(/\s+/g, "+");
-    const negativas = document.getElementById("tagsNegativas").value.trim().replace(/\s+/g, "+");
-    const tempo = parseInt(document.getElementById("tempoInput").value);
+async function buscarImagens() {
+  const positivas = document.getElementById("tagsPositivas").value.trim();
+  const negativas = document.getElementById("tagsNegativas").value.trim();
+  const tempo = parseInt(document.getElementById("tempoInput").value);
 
-    if (!positivas) {
-      alert("Digite ao menos uma tag desejada.");
-      return;
-    }
-
-    imagens = [];
-    index = 0;
-    pagina = 1;
-    fimDosResultados = false;
-    reiniciou = false;
-    pausado = false;
-    pauseLabel.textContent = "⏸ Pausar";
-
-    tempoPorImagem = (isNaN(tempo) || tempo < 1) ? 5000 : tempo * 1000;
-
-    const tags = `${positivas}${negativas ? '+-' + negativas.split('+').join('+-') : ''}`;
-    tagsAtuais = tags;
-
-    await buscarMaisImagens(tags, pagina);
-
-    if (imagens.length > 0) {
-      iniciarSlideshow();
-      document.getElementById("mensagemInicial").classList.add("hidden");
-    } else {
-      imgElement.alt = "Nenhuma imagem encontrada.";
-      imgElement.src = "";
-    }
+  if (!positivas) {
+    alert("Digite ao menos uma tag desejada.");
+    return;
   }
 
-  async function buscarMaisImagens(tags, paginaAtual) {
-    const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=1000&q=index&pid=${(paginaAtual - 1)}`;
+  // Atualiza URL com parâmetros e recarrega
+  const params = new URLSearchParams();
+  params.set("tagsPositivas", positivas);
+  params.set("tagsNegativas", negativas);
+  params.set("tempo", isNaN(tempo) ? "5" : tempo.toString());
 
-    try {
-      const response = await fetch(url);
-      const xmlText = await response.text();
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-      const posts = xmlDoc.getElementsByTagName("post");
+  const newUrl = `${location.pathname}?${params.toString()}`;
+  window.location.href = newUrl;
+}
 
-      let novas = 0;
-      for (let post of posts) {
-        const fileUrl = post.getAttribute("file_url") || post.getAttribute("sample_url");
-        if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
-          imagens.push(fileUrl);
-          novas++;
+async function buscarMaisImagens(tags, paginaAtual) {
+  const tagsFormatadas = tags.replace(/\s+/g, "+").replace(/\+-/g, "+-"); // formata tags para url
+  const url = `https://api.rule34.xxx/index.php?tags=${tagsFormatadas}&page=dapi&s=post&limit=100&q=index&pid=${(paginaAtual - 1)}`;
 
-          const preload = new Image();
-          preload.src = fileUrl;  
-        }
+  try {
+    const response = await fetch(url);
+    const xmlText = await response.text();
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    const posts = xmlDoc.getElementsByTagName("post");
+
+    let novas = 0;
+    for (let post of posts) {
+      const fileUrl = post.getAttribute("file_url") || post.getAttribute("sample_url");
+      if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
+        imagens.push(fileUrl);
+        novas++;
+
+        const preload = new Image();
+        preload.src = fileUrl;
       }
-
-      if (novas === 0) {
-        if (!reiniciou) {
-          console.log("Sem novas imagens. Reiniciando da página 1...");
-          reiniciou = true;
-          pagina = 1;
-          await buscarMaisImagens(tags, pagina);
-        } else {
-          fimDosResultados = true;
-          console.log("Fim total dos resultados.");
-        }
-      }
-    } catch (err) {
-      console.error("Erro ao buscar imagens:", err);
     }
-  }
 
+    if (novas === 0) {
+      if (!reiniciou) {
+        console.log("Sem novas imagens. Reiniciando da página 1...");
+        reiniciou = true;
+        pagina = 1;
+        await buscarMaisImagens(tags, pagina);
+      } else {
+        fimDosResultados = true;
+        console.log("Fim total dos resultados.");
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao buscar imagens:", err);
+  }
+}
 
 function alternarFullscreen() {
   const elem = document.documentElement;
@@ -236,31 +221,54 @@ function alternarFullscreen() {
   }
 }
 
-  // Atalhos de teclado
-  document.addEventListener("keydown", (e) => {
-    if (e.code === "Space") {
-      e.preventDefault();
-      alternarPausa();
-    } else if (e.code === "ArrowRight") {
-      avancarImagem();
-    } else if (e.code === "ArrowLeft") {
-      voltarImagem();
-    }
-  });
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    alternarPausa();
+  } else if (e.code === "ArrowRight") {
+    avancarImagem();
+  } else if (e.code === "ArrowLeft") {
+    voltarImagem();
+  }
+});
 
-  document.addEventListener("fullscreenchange", () => {
+document.addEventListener("fullscreenchange", () => {
   const controls = document.getElementById("controls");
   if (!document.fullscreenElement) {
     controls.style.display = "flex";
   }
 });
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js')
-    .then(reg => console.log('✅ Service Worker registrado', reg))
-    .catch(err => console.error('❌ Erro ao registrar Service Worker', err));
-}
+// Na carga da página, tenta pegar parâmetros da URL e iniciar a busca se existirem
+window.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search);
+  const tagsPos = params.get("tagsPositivas") || "";
+  const tagsNeg = params.get("tagsNegativas") || "";
+  const tempo = params.get("tempo") || "5";
 
+  if (tagsPos) {
+    document.getElementById("tagsPositivas").value = tagsPos;
+    document.getElementById("tagsNegativas").value = tagsNeg;
+    document.getElementById("tempoInput").value = tempo;
+
+    // monta tags para busca
+    let tagsBusca = `${tagsPos}`;
+    if (tagsNeg) {
+      tagsBusca += '+-' + tagsNeg.split(/\s+/).join('+-');
+    }
+    tagsAtuais = tagsBusca;
+
+    buscarMaisImagens(tagsBusca, pagina).then(() => {
+      if (imagens.length > 0) {
+        iniciarSlideshow();
+        document.getElementById("mensagemInicial").classList.add("hidden");
+      } else {
+        imgElement.alt = "Nenhuma imagem encontrada.";
+        imgElement.src = "";
+      }
+    });
+  }
+});
 
 function ajustarTempo(delta) {
   const tempoInput = document.getElementById("tempoInput");
