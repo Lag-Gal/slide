@@ -44,7 +44,11 @@
 <div id="controls">
   <input type="text" id="tagsPositivas" placeholder="Tags desejadas (ex: naked_female)">
   <input type="text" id="tagsNegativas" placeholder="Tags para excluir (ex: dick comic)">
-  <input type="number" id="tempoInput" placeholder="Tempo (seg)" value="5" min="1">
+  <div style="display: flex; align-items: center; gap: 5px;">
+    <button onclick="ajustarTempo(-1)">➖</button>
+    <input type="number" id="tempoInput" placeholder="Tempo (seg)" value="5" min="1" style="width: 70px;">
+    <button onclick="ajustarTempo(1)">➕</button>
+  </div>
   <button onclick="buscarImagens()">🔍 Buscar</button>
   <button onclick="voltarImagem()">⏮ Voltar</button>
   <button onclick="alternarPausa()"><span id="pauseLabel">⏸ Pausar</span></button>
@@ -68,25 +72,38 @@
   const imgElement = document.getElementById("slideshow");
   const pauseLabel = document.getElementById("pauseLabel");
 
-  function iniciarSlideshow() {
-    if (intervalo) clearInterval(intervalo);
+function iniciarSlideshow() {
+  if (intervalo) clearInterval(intervalo);
 
-    async function trocarImagem() {
+  async function trocarImagem() {
+    if (!pausado && imagens.length > 0) {
+      imgElement.src = imagens[index];
+
+      if (index >= imagens.length - 5 && !fimDosResultados) {
+        pagina++;
+        await buscarMaisImagens(tagsAtuais, pagina);
+      }
+
+      index = (index + 1) % imagens.length;
+    }
+  }
+
+  trocarImagem(); // mostra a primeira
+
+  const loop = async () => {
+    while (true) {
+      const tempoCampo = parseInt(document.getElementById("tempoInput").value);
+      tempoPorImagem = (isNaN(tempoCampo) || tempoCampo < 1) ? 5000 : tempoCampo * 1000;
+
+      await new Promise(resolve => setTimeout(resolve, tempoPorImagem));
       if (!pausado && imagens.length > 0) {
-        imgElement.src = imagens[index];
-
-        if (index >= imagens.length - 5 && !fimDosResultados) {
-          pagina++;
-          await buscarMaisImagens(tagsAtuais, pagina);
-        }
-
-        index = (index + 1) % imagens.length;
+        trocarImagem();
       }
     }
+  };
 
-    trocarImagem();
-    intervalo = setInterval(trocarImagem, tempoPorImagem);
-  }
+  loop(); // inicia o loop dinâmico
+}
 
   function alternarPausa() {
     if (imagens.length === 0) return;
@@ -157,6 +174,9 @@
         if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
           imagens.push(fileUrl);
           novas++;
+
+          const preload = new Image();
+          preload.src = fileUrl;  
         }
       }
 
@@ -215,6 +235,17 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js')
     .then(reg => console.log('✅ Service Worker registrado', reg))
     .catch(err => console.error('❌ Erro ao registrar Service Worker', err));
+}
+
+
+function ajustarTempo(delta) {
+  const tempoInput = document.getElementById("tempoInput");
+  let valorAtual = parseInt(tempoInput.value) || 5;
+  valorAtual += delta;
+
+  if (valorAtual < 1) valorAtual = 1;
+
+  tempoInput.value = valorAtual;
 }
 
 </script>
