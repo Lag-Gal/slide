@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Apresentação de Imagens</title>
+  <title>Slides Lag Gal</title>
+  <link rel="icon" type="image/png" href="icon-192.png">
   <style>
     body {
       margin: 0;
@@ -29,11 +30,23 @@
     #controls button {
       padding: 5px 10px;
     }
+    #mensagemInicial {
+      color: white;
+      text-align: center;
+      padding: 20px;
+      max-width: 800px;
+      font-size: 1rem;
+    }
+    #mensagemInicial.hidden {
+      display: none;
+    }
     #slideshow {
       max-width: 100%;
       max-height: 90vh;
       object-fit: contain;
       flex-grow: 1;
+      display: none;
+      
     }
   </style>
   <link rel="manifest" href="manifest.json">
@@ -54,6 +67,12 @@
   <button onclick="alternarPausa()"><span id="pauseLabel">⏸ Pausar</span></button>
   <button onclick="avancarImagem()">⏭ Avançar</button>
   <button onclick="alternarFullscreen()">🖥️ Tela Cheia</button>
+</div>
+
+<div id="mensagemInicial">
+  <h2>Bem-vindo ao Slides Lag Gal (nome beta)</h2>
+  <p>Digite as <strong>tags desejadas</strong> e <strong>tags a excluir</strong>, depois clique em <strong>🔍 Buscar</strong>.</p>
+  <p>Você pode ajustar o tempo entre imagens, padrão de 5 segundos, usar fullscreen e navegar com ⬅️ ➡️ ou espaço.</p>
 </div>
 
 <img id="slideshow" src="" alt="Aguardando busca...">
@@ -78,6 +97,8 @@ function iniciarSlideshow() {
   async function trocarImagem() {
     if (!pausado && imagens.length > 0) {
       imgElement.src = imagens[index];
+      imgElement.style.display = "block";
+
 
       if (index >= imagens.length - 5 && !fimDosResultados) {
         pagina++;
@@ -111,19 +132,21 @@ function iniciarSlideshow() {
     pauseLabel.textContent = pausado ? "▶ Retomar" : "⏸ Pausar";
   }
 
-  function avancarImagem() {
-    if (imagens.length > 0) {
-      index = (index + 1) % imagens.length;
-      imgElement.src = imagens[index];
-    }
+function avancarImagem() {
+  if (imagens.length > 0) {
+    index = (index + 1) % imagens.length;
+    imgElement.src = imagens[index];
+    imgElement.style.display = "block";
   }
+}
 
-  function voltarImagem() {
-    if (imagens.length > 0) {
-      index = (index - 1 + imagens.length) % imagens.length;
-      imgElement.src = imagens[index];
-    }
+function voltarImagem() {
+  if (imagens.length > 0) {
+    index = (index - 1 + imagens.length) % imagens.length;
+    imgElement.src = imagens[index];
+    imgElement.style.display = "block";
   }
+}
 
   async function buscarImagens() {
     const positivas = document.getElementById("tagsPositivas").value.trim().replace(/\s+/g, "+");
@@ -152,6 +175,7 @@ function iniciarSlideshow() {
 
     if (imagens.length > 0) {
       iniciarSlideshow();
+      document.getElementById("mensagemInicial").classList.add("hidden");
     } else {
       imgElement.alt = "Nenhuma imagem encontrada.";
       imgElement.src = "";
