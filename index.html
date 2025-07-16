@@ -91,6 +91,7 @@
 
   <script>
     let imagens = [];
+    let ordemApresentacao = []; // NOVO: controla ordem das imagens exibidas
     let index = 0;
     let timerId = null; // timer para controlar troca baseada no carregamento
     let pausado = false;
@@ -103,6 +104,15 @@
     const imgElement = document.getElementById("slideshow");
     const pauseLabel = document.getElementById("pauseLabel");
 
+    // Função para embaralhar um array (Fisher-Yates)
+    function embaralhar(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
     function iniciarSlideshow() {
       if (timerId) {
         clearTimeout(timerId);
@@ -112,20 +122,22 @@
       async function trocarImagem() {
         if (!pausado && imagens.length > 0) {
           imgElement.style.display = "none";
-          imgElement.src = imagens[index];
+          // Mostrar imagem usando ordemApresentacao
+          imgElement.src = imagens[ordemApresentacao[index]];
 
-          // Ao carregar a imagem, mostra e agenda a próxima troca
           imgElement.onload = async () => {
             imgElement.style.display = "block";
 
-            if (index >= imagens.length - 5 && !fimDosResultados) {
+            // Buscar mais imagens se perto do fim
+            if (index >= ordemApresentacao.length - 5 && !fimDosResultados) {
               pagina++;
               await buscarMaisImagens(tagsAtuais, pagina);
             }
 
-            index = (index + 1) % imagens.length;
+            // Avança índice circularmente na ordemApresentacao
+            index = (index + 1) % ordemApresentacao.length;
 
-            // Pega tempo atualizado da entrada
+            // Atualiza tempo do input
             const tempoCampo = parseInt(document.getElementById("tempoInput").value);
             tempoPorImagem = isNaN(tempoCampo) || tempoCampo < 1 ? 5000 : tempoCampo * 1000;
 
@@ -134,10 +146,9 @@
             }, tempoPorImagem);
           };
 
-          // Caso a imagem não carregue (erro), pode tentar pular para próxima
           imgElement.onerror = () => {
             console.warn("Erro ao carregar imagem, pulando para próxima.");
-            index = (index + 1) % imagens.length;
+            index = (index + 1) % ordemApresentacao.length;
             trocarImagem();
           };
         }
@@ -152,10 +163,8 @@
       pauseLabel.textContent = pausado ? "▶ Retomar" : "⏸ Pausar";
 
       if (!pausado) {
-        // Se retomar, reinicia slideshow para disparar timer
         iniciarSlideshow();
       } else {
-        // Se pausar, cancela timer
         if (timerId) {
           clearTimeout(timerId);
           timerId = null;
@@ -169,43 +178,25 @@
           clearTimeout(timerId);
           timerId = null;
         }
-        index = (index + 1) % imagens.length;
-        imgElement.src = imagens[index];
+        index = (index + 1) % ordemApresentacao.length;
+        imgElement.src = imagens[ordemApresentacao[index]];
         imgElement.style.display = "block";
-        // Reinicia slideshow para controlar timer após avanço manual
         iniciarSlideshow();
       }
     }
 
     function voltarImagem() {
-      if (imagens.length === 0 || index === 0) return; // nada a fazer se não houver imagens ou já estiver na primeira
-
+      if (imagens.length === 0) return;
       if (timerId) {
         clearTimeout(timerId);
         timerId = null;
       }
-
-      index--; // Move corretamente para a imagem anterior
-
-      imgElement.onload = () => {
-        imgElement.style.display = "block";
-
-        // Reinicia o slideshow sem avançar o index
-        const tempoCampo = parseInt(document.getElementById("tempoInput").value);
-        tempoPorImagem = isNaN(tempoCampo) || tempoCampo < 1 ? 5000 : tempoCampo * 1000;
-
-        timerId = setTimeout(() => {
-          iniciarSlideshow(); // que por sua vez avança corretamente a partir daqui
-        }, tempoPorImagem);
-      };
-
-      imgElement.onerror = () => {
-        console.warn("Erro ao carregar imagem anterior, tentando anterior ainda...");
-        voltarImagem(); // tenta a anterior de novo
-      };
-
-      imgElement.style.display = "none";
-      imgElement.src = imagens[index];
+      // Voltar no índice respeitando limites
+      if (index === 0) return; // já na primeira imagem, não volta mais
+      index--;
+      imgElement.src = imagens[ordemApresentacao[index]];
+      imgElement.style.display = "block";
+      iniciarSlideshow();
     }
 
     async function buscarImagens() {
@@ -225,6 +216,7 @@
       }
 
       imagens = [];
+      ordemApresentacao = []; // Resetar ordem também
       index = 0;
       pagina = 1;
       fimDosResultados = false;
@@ -234,13 +226,17 @@
 
       tempoPorImagem = isNaN(tempo) || tempo < 1 ? 5000 : tempo * 1000;
 
-      const tags = `${positivas}${negativas ? "+-" + negativas.split("+").join("+-") : ""
-        }`;
+      const tags = `${positivas}${negativas ? "+-" + negativas.split("+").join("+-") : ""}`;
       tagsAtuais = tags;
 
       await buscarMaisImagens(tags, pagina);
 
       if (imagens.length > 0) {
+        // Criar ordem de apresentação embaralhada (ou simplesmente sequencial)
+        ordemApresentacao = imagens.map((_, i) => i);
+        ordemApresentacao = embaralhar(ordemApresentacao); // <-- Aqui embaralha
+        index = 0;
+
         iniciarSlideshow();
         document.getElementById("mensagemInicial").classList.add("hidden");
       } else {
@@ -250,8 +246,7 @@
     }
 
     async function buscarMaisImagens(tags, paginaAtual) {
-      const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=20&q=index&pid=${paginaAtual - 1
-        }`;
+      const url = `https://api.rule34.xxx/index.php?tags=${tags}&page=dapi&s=post&limit=100&q=index&pid=${paginaAtual - 1}`;
 
       try {
         const response = await fetch(url);
@@ -265,6 +260,7 @@
           const fileUrl = post.getAttribute("file_url") || post.getAttribute("sample_url");
           if (fileUrl && !fileUrl.endsWith(".mp4") && !imagens.includes(fileUrl)) {
             imagens.push(fileUrl);
+            ordemApresentacao.push(imagens.length - 1); // adicionar novo índice no fim da ordem
             novas++;
 
             // preload
